@@ -13,8 +13,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-# 项目根目录:fundlens/fundlens/db.py -> 上两级
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "db" / "market.db"
 SCHEMA_PATH = PROJECT_ROOT / "schema.sql"
 

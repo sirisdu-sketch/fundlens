@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(.\\\\venv\\\\Scripts\\\\Activate.ps1)",
+      "PowerShell(.\\\\venv\\\\Scripts\\\\python.exe -m pip install -e \".[dev]\")",
+      "PowerShell(git init *)",
+      "PowerShell(git add *)",
+      "PowerShell(git commit *)",
+      "PowerShell(D:\\\\code\\\\fundlens\\\\venv\\\\Scripts\\\\python.exe -m pip show fundlens)",
+      "PowerShell(Get-ChildItem D:\\\\code\\\\fundlens\\\\venv\\\\Lib\\\\site-packages | Select-Object Name | Where-Object {$_.Name -match \"fund|editable|pth\"})"
+    ]
+  }
+}
