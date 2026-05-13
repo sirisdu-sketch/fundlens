@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AiResearch } from "@/components/ai-research";
 import { PriceChart } from "@/components/chart";
 import { IndicatorPanel } from "@/components/indicator-panel";
 import { RangeTabs } from "@/components/range-tabs";
@@ -103,6 +104,11 @@ export default function FundDetailPage({ params, searchParams }: PageProps) {
           />
         </section>
       )}
+
+      {/* AI Research */}
+      <section className="mb-12">
+        <AiResearch code={params.code} />
+      </section>
 
       <footer className="mt-16 pt-8 border-t border-ink-800 text-xs text-ink-500 font-mono">
         <p>仅供个人研究学习。不构成投资建议。</p>

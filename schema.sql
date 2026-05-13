@@ -52,3 +52,18 @@ CREATE TABLE IF NOT EXISTS sync_log (
     synced_at   INTEGER,                -- 上次同步时间
     PRIMARY KEY (code, data_type)
 );
+
+-- AI 解读缓存(Day 3)
+-- 设计要点:
+-- 1. 主键含 context_hash → 同样输入数字 → 直接返回缓存,不重复烧 token
+-- 2. 主键含 model → 换模型重新生成,旧记录保留可对比
+-- 3. context_json 完整存输入,方便审计 / 复现
+CREATE TABLE IF NOT EXISTS research_contexts (
+    code         TEXT NOT NULL,
+    context_hash TEXT NOT NULL,   -- 输入数字归一化后的 SHA256 前 16 位
+    model        TEXT NOT NULL,
+    context_json TEXT NOT NULL,
+    analysis     TEXT NOT NULL,
+    generated_at INTEGER NOT NULL,
+    PRIMARY KEY (code, context_hash, model)
+);
