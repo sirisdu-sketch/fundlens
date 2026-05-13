@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-display: "Instrument Serif", Georgia, serif;
+    --font-sans: "Geist", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  html {
+    background-color: #0a0908;
+    color: #d0ccc4;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    /* 细微的纸张噪点 — 给"editorial"质感 */
+    background-image:
+      radial-gradient(at 20% 0%, rgba(212, 165, 116, 0.04) 0%, transparent 50%),
+      radial-gradient(at 80% 100%, rgba(212, 165, 116, 0.03) 0%, transparent 50%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  /* 等宽数字默认开启 tabular-nums,让所有 .font-mono 数字对齐 */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* 自定义 utility — 衬线显示标题 */
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+/* 滚动条 — 暗色细致 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a2724; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a3631; }

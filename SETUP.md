@@ -1,114 +1,100 @@
-# Day 1 上午 — 上手指南
+# Day 1 — 上手指南
 
-预计耗时:30-60 分钟(主要等 AKShare 拉数据)
-
-## 0. 准备(2 分钟)
-
-```bash
-# 解压后进入项目目录
-cd fundlens
-
-# 在 VSCode 里打开
-code .
-```
-
-VSCode 推荐插件:Python、Pylance、Ruff(已经在 pyproject.toml 配好规则)。
-
-## 1. 创建虚拟环境(2 分钟)
-
-**Windows (PowerShell)**:
-```powershell
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-
-**Mac/Linux**:
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-确认激活成功:命令行前面应该出现 `(.venv)`。
-
-## 2. 安装依赖(3-5 分钟)
-
-```bash
-pip install -e ".[dev]"
-```
-
-`-e` 是 editable 安装,你改代码后不用重新装。`[dev]` 是开发依赖(pytest 等)。
-
-> ⚠️ 如果 akshare 装得慢,加镜像:
-> `pip install -e ".[dev]" -i https://pypi.tuna.tsinghua.edu.cn/simple`
-
-## 3. 跑测试(30 秒)— 先确认环境对
-
-```bash
-pytest
-```
-
-应该看到 4 个测试全过。**如果挂了,先解决这里,数据再说**。
-
-## 4. 同步基金数据(5-15 分钟)
-
-```bash
-python -m fundlens.sync
-```
-
-会看到:
-```
-[INFO] Database ready at .../db/market.db
-[INFO] Syncing 5 fund(s)...
-[INFO] Syncing fund 161725...
-[INFO]   OK  161725 (招商中证白酒指数A): 1234 rows total, 1234 new, last 2026-05-09
-[INFO] Syncing fund 019547...
-...
-```
-
-**预期问题**:
-- AKShare 首次跑会拉一个全市场基金列表(获取名称),会慢一点 / 偶尔超时。已经内置 3 次重试。
-- 如果某只基金挂了,其他会继续。不要被一只失败搞乱节奏。
-
-## 5. 验证数据进库了
-
-```bash
-# 看基金列表
-sqlite3 db/market.db "SELECT code, name FROM instruments;"
-
-# 看每只基金的行情条数
-sqlite3 db/market.db "SELECT code, COUNT(*) AS n, MIN(date) AS start, MAX(date) AS end FROM price_daily GROUP BY code;"
-```
-
-或者在 VSCode 里装 **SQLite Viewer** 插件,双击 `db/market.db` 直接看表。
-
-## 6. 提交第一个 commit
-
-```bash
-git init
-git add .
-git commit -m "feat: data layer with AKShare ingestion + sqlite schema"
-```
-
-用 GitHub Desktop 也行:Repository → Create New Repository → 指到 `fundlens` 目录,然后 Publish。
+完整 Day 1 流程预计 1-2 小时(含等数据)。
 
 ---
 
-## Day 1 上午到此结束
+## Day 1 上午 ✅(你已经搞定)
 
-**完成的事**:
-- ✅ 项目骨架 + pyproject.toml(可发布的标准 Python 包)
-- ✅ SQLite schema 4 张表
-- ✅ AKShare 封装(限速 + 重试 + 错误处理)
-- ✅ 5 只基金的累计净值入库
-- ✅ pytest 4 个测试
+数据层 + AKShare 摄取 + 4 个 db 测试。
 
-**下一步:Day 1 下午**
+---
 
-- 在 `fundlens/indicators/` 写指标模块(RSI / MA / 最大回撤)
-- 在 `tests/test_indicators.py` 写测试(用手算参考值)
-- 计算结果写入 `indicators` 表
+## Day 1 下午 — 指标层
 
-跑通本指南后跟我说"Day 1 上午搞定",我直接出 Day 1 下午的代码。
+### 1. 解压覆盖
+
+把新 zip 解压,覆盖原 `fundlens/` 项目目录。新增/修改:
+
+- `fundlens/indicators/`(新增,3 个文件 + `__init__.py`)
+- `fundlens/compute.py`(新增,批量计算入口)
+- `tests/test_indicators.py`(新增,9 个测试)
+
+### 2. 跑测试 — 先确认指标正确
+
+```bash
+pytest -v
+```
+
+应该看到 **13 个测试全过**(4 个 db + 9 个 indicators)。
+
+> **简历亮点**:每个指标测试都有手算注释。比如 `test_rsi_mixed_matches_hand_calculation`
+> 的 docstring 写明了 delta/gain/loss/RS/RSI 每一步如何算出 66.67 / 33.33 / 100。
+> 面试官能看出"这个人理解指标的数学,而不是调了个库"。
+
+### 3. 计算指标并写库
+
+```bash
+python -m fundlens.compute
+```
+
+预期输出:
+```
+[INFO] Computing indicators for 5 fund(s)...
+[INFO]   OK   161725: 1234 rows written, latest RSI(14)=42.3
+[INFO]   OK   019547: 567 rows written, latest RSI(14)=58.1
+...
+```
+
+`compute` 是**全量重算**,每次都把所有日期的指标重写一遍。Day 1 数据量小
+(5 只 × 几千行),不到 1 秒。Phase 2 数据量大时再加增量。
+
+### 4. 验证 indicators 表
+
+```bash
+sqlite3 db/market.db "
+SELECT code, date,
+       ROUND(rsi_14, 1)      AS rsi,
+       ROUND(ma_20, 4)       AS ma20,
+       ROUND(volatility, 1)  AS vol,
+       ROUND(momentum_20, 1) AS mom20
+FROM indicators
+WHERE date = (SELECT MAX(date) FROM indicators)
+ORDER BY rsi DESC;
+"
+```
+
+这一条 SQL 已经能告诉你**今天哪只基金技术面最强**(RSI 高 + 在均线上方 + 动量为正)。
+
+### 5. Commit
+
+```bash
+git add .
+git commit -m "feat: indicators module (RSI/MA/MaxDD) with 9 unit tests"
+```
+
+---
+
+## Day 1 完成清单
+
+| 已完成 | 文件 |
+|---|---|
+| 标准 Python 包 | `pyproject.toml` |
+| SQLite schema 4 张表 | `schema.sql` |
+| AKShare 限速重试封装 | `fundlens/fetcher.py` |
+| 数据同步 CLI | `fundlens/sync.py` |
+| 5 个指标实现 | `fundlens/indicators/` |
+| 指标批量计算 CLI | `fundlens/compute.py` |
+| **13 个 pytest 测试,手算 + 边界双覆盖** | `tests/` |
+
+**两条命令的完整流水线**:
+```bash
+python -m fundlens.sync       # 拉数据
+python -m fundlens.compute    # 算指标
+```
+
+跑通后跟我说"Day 1 全部搞定",我出 Day 2 的代码
+(Next.js + lightweight-charts + 详情页 + 操作建议卡片)。
 
 ---
 
@@ -116,8 +102,7 @@ git commit -m "feat: data layer with AKShare ingestion + sqlite schema"
 
 | 症状 | 解决 |
 |------|------|
-| `pip install` 装 akshare 报错 | 用清华镜像源(见上面) |
-| `pytest` 报 `ModuleNotFoundError: fundlens` | 确认在 `.venv` 里,且跑了 `pip install -e .` |
-| AKShare 拉数据超时 | 网络问题,重跑就行,数据是幂等的 |
-| 某只基金代码拉不到 | 复制基金代码到天天基金网搜一下,确认是开放式基金 |
-| Windows PowerShell 激活脚本被禁 | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| `pytest` 报 ModuleNotFoundError | `pip install -e .` 重装一次 |
+| `compute` 显示某只基金 "no price data" | 先跑 `sync` 拉该只数据 |
+| RSI 大量 NaN | 正常,前 14 天没数据 |
+| `ma_250` 全是 NaN | 该基金历史不足 250 天,正常 |

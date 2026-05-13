@@ -2,7 +2,7 @@
 
 > Personal fund analysis platform — built in 3 days as a portfolio piece.
 
-**Status**: Day 1 in progress (data layer + ingestion)
+**Status**: Day 2 complete — full-stack MVP runs end-to-end
 
 ## Architecture (3-day MVP)
 
@@ -26,7 +26,11 @@ python -m fundlens.sync
 # 3. 跑测试
 pytest
 
-# 4. 查看数据库内容
+# 4. 启动 Web 前端
+cd web && npm install && npm run dev
+# 打开 http://localhost:3000
+
+# 5. 查看数据库内容
 sqlite3 db/market.db "SELECT code, name FROM instruments;"
 sqlite3 db/market.db "SELECT COUNT(*) FROM price_daily;"
 ```
@@ -49,8 +53,8 @@ fundlens/
 ## Roadmap
 
 - [x] Day 1 上午:数据层 + AKShare 摄取
-- [ ] Day 1 下午:核心指标(RSI / MA / 最大回撤)+ pytest 覆盖
-- [ ] Day 2:Next.js + lightweight-charts 详情页
+- [x] Day 1 下午:核心指标(RSI / MA / 最大回撤)+ pytest 覆盖
+- [x] Day 2:Next.js + lightweight-charts 详情页
 - [ ] Day 3:Gemini AI 解说 + CI + 部署
 
 ## Tech decisions
