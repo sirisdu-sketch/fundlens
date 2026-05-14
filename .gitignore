@@ -48,3 +48,7 @@ web/out/
 web/.env*.local
 web/next-env.d.ts.bak
 web/tsconfig.tsbuildinfo
+
+# ─── Claude Code (local IDE settings) ───
+.claude/settings.local.json
+web/.claude/

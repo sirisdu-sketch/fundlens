@@ -9,9 +9,9 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 # 项目根目录:fundlens/fundlens/db.py -> 上两级
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

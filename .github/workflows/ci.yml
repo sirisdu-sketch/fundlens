@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Python: pytest + ruff (lint) + mypy (type check)
+  # ─────────────────────────────────────────────
+  python:
+    name: Python · test + lint + types
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Lint (ruff)
+        run: ruff check fundlens tests
+
+      - name: Type check (mypy)
+        # mypy 不阻塞 — 类型注解是渐进式加上的
+        run: mypy fundlens || true
+
+      - name: Test (pytest)
+        run: pytest -v
+
+  # ─────────────────────────────────────────────
+  # Web: typecheck + lint + build
+  # ─────────────────────────────────────────────
+  web:
+    name: Web · typecheck + lint + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx next lint
+
+      - name: Build
+        run: npx next build
+        env:
+          # build 不需要真实 key,占位即可(API route 是 dynamic,不会在 build 时调用)
+          GEMINI_API_KEY: dummy_key_for_build

@@ -7,29 +7,27 @@ import type { IndicatorPoint, PricePoint, Signal } from "./types";
 // SYSTEM PROMPT — 严格的"解说员"角色
 //
 // 关键原则:
-// 1. Gemini 只翻译数字,不补充信息(GPT 的建议)
+// 1. Gemini 只翻译数字,不补充信息
 // 2. 不给具体操作建议(那是 signals.ts 的规则引擎职责)
 // 3. 用词约束 + 长度约束,避免营销腔
 // ============================================================
-const SYSTEM_PROMPT = `你是 FundLens 的量化分析员，基于技术指标对基金走势做出专业研判。
+const SYSTEM_PROMPT = `你是 FundLens 内置的数据解说员。
 
-【分析框架】
-综合均线结构、动量、波动率与回撤，判断当前所处的趋势阶段，并给出概率性的后续展望。
+【职责】
+将下面 INPUT 中提供的结构化技术指标数字,翻译为 100-200 字的自然语言判断。
 
-【允许的分析方式】
-1. 趋势研判：均线多头/空头/纠缠排列对应的趋势强度与方向
-2. 动量与反转：RSI 处于超买/超卖/中性区间时的历史统计含义
-3. 风险评估：波动率与最大回撤所反映的持仓风险
-4. 情景分析：用"若……则……"描述关键价位突破后的大概率演变路径
-
-【输出要求】
-- 简体中文，150-250 字，一段纯文本，不使用 markdown、列表或 emoji
-- 用概率性措辞（如"倾向于""偏多""历史上该形态通常""需警惕"），避免过度确定
-- 覆盖顺序（可灵活调整）：趋势判断 → 动量/反转信号 → 风险提示 → 关键观察位
-- 不给出"建议买入/卖出"等具体操作指令，但可以明确描述信号偏多/偏空的强度
-
-【禁用词】"必涨"、"必跌"、"暴涨"、"暴跌"、"建议买入"、"建议卖出"、"加仓"、"减仓"
-不要写标题或开场白，直接开始分析。`;
+【严格规则】
+1. 只使用 INPUT 中明确给出的数字。不补充任何外部信息——不引用新闻、行业、宏观数据、其他基金,也不预测未来走势或具体点位。
+2. 不给出"建议买入/卖出/加仓/减仓"等具体操作建议。这些由系统的规则引擎单独处理,你只描述当前状态。
+3. 输出:简体中文,一段纯文本,不使用 markdown、列表或 emoji。
+4. 语气:专业、克制、客观,像研究报告而非营销文案。
+5. 内容覆盖(顺序可调):
+   - 当前价格相对于各均线的位置
+   - RSI 与动量反映的短期状态
+   - 波动率所处水平
+   - 一个值得继续观察的条件(如"若跌破 X 均线则...""若 RSI 重回 Y 区间则...")
+6. 禁用词汇:"必涨"、"必跌"、"暴涨"、"暴跌"、"建议买入"、"建议卖出"、"加仓"、"减仓"、"重仓"、"满仓"
+7. 长度:100-200 字。不要写标题或开场白。`;
 
 // ============================================================
 // Context — 喂给 Gemini 的结构化输入
@@ -156,7 +154,16 @@ ${fmtMa(ind.ma250, "MA250")}
 }
 
 // ============================================================
-// Gemini 调用
+// Gemini 调用(新 SDK @google/genai)
+//
+// 新 SDK 关键变化:
+// - import { GoogleGenAI } 而非 GoogleGenerativeAI
+// - 不再 getGenerativeModel + model.generateContent,统一为
+//   ai.models.generateContent({ model, contents, config })
+// - response.text 是属性,不是 .text() 方法
+// - systemInstruction / temperature / maxOutputTokens 直接放 config,
+//   不再有嵌套的 generationConfig
+// - 默认走 v1beta 端点;若需稳定端点可在 new GoogleGenAI({apiVersion:"v1"})
 // ============================================================
 
 export const DEFAULT_MODEL = "gemini-2.5-flash";
@@ -177,20 +184,21 @@ export async function callGemini(userPrompt: string): Promise<string> {
   }
 
   const ai = new GoogleGenAI({ apiKey });
-  const result = await ai.models.generateContent({
+
+  const response = await ai.models.generateContent({
     model: getModelName(),
     contents: userPrompt,
     config: {
       systemInstruction: SYSTEM_PROMPT,
-      temperature: 0.4,
-      maxOutputTokens: 3000,  // thinking token + 回复 token 共享此配额，需留足空间
+      temperature: 0.3,       // 低温度,克制 + 一致
+      maxOutputTokens: 800,   // 2.5 Flash 默认开启 thinking,留点预算
       topP: 0.9,
-      thinkingConfig: { thinkingBudget: 1024 },  // 轻量推理，够趋势研判用
+      // 关闭 thinking 节省 token 与延迟;解说员任务无需推理链
+      thinkingConfig: { thinkingBudget: 0 },
     },
   });
 
-  const text = (result.text ?? "").trim();
-
+  const text = response.text?.trim();
   if (!text) {
     throw new Error("Gemini returned empty response");
   }

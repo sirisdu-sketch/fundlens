@@ -1,25 +1,32 @@
 import Database from "better-sqlite3";
 import path from "path";
 
+import { ensureSchema } from "./db-init";
+
 // 模块级单例 — Next.js dev 模式下热重载也只创建一个连接
 let _db: Database.Database | null = null;
 
+function getDbPath(): string {
+  // Next.js 在 web/ 子目录跑;数据库在项目根的 db/ 目录,与 Python 端共享
+  return path.join(process.cwd(), "..", "db", "market.db");
+}
+
 /**
- * 获取 SQLite 连接。
+ * 获取只读 SQLite 连接(用于查询行情、指标)。
  *
- * - 路径:相对于 web/ 目录的上一级 db/market.db
- *   即整个项目根下的 db 目录,跟 Python 端共享同一个文件。
- * - 只读模式:web 层只做查询。写入由 Python 端 sync/compute 完成。
- * - readonly + fileMustExist:文件不存在直接抛错,而不是悄悄创建空 db。
+ * 关键设计:
+ * - 第一次调用时,先以 RW 模式建表(ensureSchema 幂等),再以 RO 模式打开
+ * - 行情/指标由 Python 端 sync/compute 写入,Next.js 这条连接只查
+ * - AI 缓存的写入由 lib/ai-cache.ts 的另一条 RW 连接负责
+ * - 双连接划分体现 principle of least privilege:每条连接只拥有必需的权限
  */
 export function getDb(): Database.Database {
   if (_db) return _db;
 
-  const dbPath = path.join(process.cwd(), "..", "db", "market.db");
-  _db = new Database(dbPath, {
-    readonly: true,
-    fileMustExist: true,
-  });
+  const dbPath = getDbPath();
+  ensureSchema(dbPath);  // 幂等;保证文件 + 所有表都存在
+
+  _db = new Database(dbPath, { readonly: true, fileMustExist: true });
   _db.pragma("journal_mode = WAL");
   return _db;
 }

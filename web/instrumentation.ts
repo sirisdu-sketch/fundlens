@@ -11,8 +11,10 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   try {
-    const { initRwDb } = await import("./lib/ai-cache");
-    initRwDb();
+    const path = await import("path");
+    const { ensureSchema } = await import("./lib/db-init");
+    const dbPath = path.join(process.cwd(), "..", "db", "market.db");
+    ensureSchema(dbPath);
     console.log("[fundlens] DB initialized: research_contexts ready");
   } catch (err) {
     // db/market.db 还不存在(Python sync 尚未运行)时静默跳过。

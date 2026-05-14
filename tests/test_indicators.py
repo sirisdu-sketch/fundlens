@@ -20,7 +20,6 @@ import pytest
 
 from fundlens.indicators import ma, max_drawdown, rsi
 
-
 # ============================================================
 # MA (Moving Average) - 3 tests
 # ============================================================
