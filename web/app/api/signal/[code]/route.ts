@@ -9,8 +9,10 @@ export async function GET(
   { params }: { params: { code: string } },
 ) {
   try {
-    const latest = getLatestIndicator(params.code);
-    const close = getLatestClose(params.code);
+    const [latest, close] = await Promise.all([
+      getLatestIndicator(params.code),
+      getLatestClose(params.code),
+    ]);
     if (!latest || close === null) {
       return NextResponse.json(
         { error: "no data for this fund" },

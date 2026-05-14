@@ -15,14 +15,25 @@ interface ResearchResponse {
   hash: string;
 }
 
+interface PromptResponse {
+  systemPrompt: string;
+  userPrompt: string;
+}
+
 type UiState =
   | { kind: "idle" }
   | { kind: "loading" }
   | { kind: "done"; data: ResearchResponse }
   | { kind: "error"; message: string };
 
+type PromptPanel =
+  | { kind: "hidden" }
+  | { kind: "loading" }
+  | { kind: "shown"; text: string; copied: boolean };
+
 export function AiResearch({ code }: Props) {
   const [state, setState] = useState<UiState>({ kind: "idle" });
+  const [panel, setPanel] = useState<PromptPanel>({ kind: "hidden" });
 
   const generate = async () => {
     setState({ kind: "loading" });
@@ -30,10 +41,7 @@ export function AiResearch({ code }: Props) {
       const res = await fetch(`/api/research/${code}`);
       const data = await res.json();
       if (!res.ok) {
-        setState({
-          kind: "error",
-          message: data.error || `HTTP ${res.status}`,
-        });
+        setState({ kind: "error", message: data.error || `HTTP ${res.status}` });
         return;
       }
       setState({ kind: "done", data: data as ResearchResponse });
@@ -45,24 +53,70 @@ export function AiResearch({ code }: Props) {
     }
   };
 
+  const togglePrompt = async () => {
+    if (panel.kind === "shown") {
+      setPanel({ kind: "hidden" });
+      return;
+    }
+    setPanel({ kind: "loading" });
+    try {
+      const res = await fetch(`/api/research/${code}/prompt`);
+      const data: PromptResponse = await res.json();
+      const text =
+        `【系统提示词】\n${data.systemPrompt}\n\n【用户输入】\n${data.userPrompt}`;
+      setPanel({ kind: "shown", text, copied: false });
+    } catch {
+      setPanel({ kind: "hidden" });
+    }
+  };
+
+  const copyPrompt = () => {
+    if (panel.kind !== "shown") return;
+    navigator.clipboard.writeText(panel.text);
+    setPanel({ ...panel, copied: true });
+    setTimeout(
+      () => setPanel((p) => (p.kind === "shown" ? { ...p, copied: false } : p)),
+      2000,
+    );
+  };
+
   return (
     <section className="rounded-2xl border border-ink-800 bg-ink-900/40 p-5 md:p-7">
-      <div className="flex items-baseline justify-between mb-5">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
         <div className="flex items-baseline gap-3">
           <h2 className="display text-2xl text-ink-100">AI 解读</h2>
           <span className="text-[10px] uppercase tracking-[0.2em] text-amber/70">
             powered by Gemini
           </span>
         </div>
-        {state.kind === "done" && (
-          <span className="text-xs font-mono text-ink-500">
-            {state.data.cached ? "缓存命中" : "刚刚生成"}
-            <span className="ml-2 text-ink-600">·</span>
-            <span className="ml-2 text-ink-600">{state.data.model}</span>
-          </span>
-        )}
+        <div className="flex items-center gap-4">
+          {state.kind === "done" && (
+            <span className="text-xs font-mono text-ink-500">
+              {state.data.cached ? "缓存命中" : "刚刚生成"}
+              <span className="ml-2 text-ink-600">·</span>
+              <span className="ml-2 text-ink-600">{state.data.model}</span>
+            </span>
+          )}
+          <button
+            onClick={togglePrompt}
+            disabled={panel.kind === "loading"}
+            className={`text-xs font-mono uppercase tracking-wider transition-colors ${
+              panel.kind === "shown"
+                ? "text-amber"
+                : "text-ink-500 hover:text-ink-200"
+            }`}
+          >
+            {panel.kind === "loading"
+              ? "..."
+              : panel.kind === "shown"
+                ? "收起提示词"
+                : "导出提示词"}
+          </button>
+        </div>
       </div>
 
+      {/* Main content */}
       {state.kind === "idle" && <Idle onClick={generate} />}
       {state.kind === "loading" && <Loading />}
       {state.kind === "done" && (
@@ -71,7 +125,56 @@ export function AiResearch({ code }: Props) {
       {state.kind === "error" && (
         <ErrorView message={state.message} onRetry={generate} />
       )}
+
+      {/* Prompt export panel */}
+      {panel.kind === "shown" && (
+        <PromptExportPanel
+          text={panel.text}
+          copied={panel.copied}
+          onCopy={copyPrompt}
+        />
+      )}
     </section>
+  );
+}
+
+function PromptExportPanel({
+  text,
+  copied,
+  onCopy,
+}: {
+  text: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <div className="mt-6 rounded-xl border border-ink-700 bg-ink-950/60 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[11px] font-mono uppercase tracking-wider text-ink-400">
+          完整提示词
+        </p>
+        <button
+          onClick={onCopy}
+          className={`text-xs font-mono px-3 py-1 rounded border transition-all ${
+            copied
+              ? "border-up/40 bg-up/10 text-up"
+              : "border-ink-600 text-ink-400 hover:border-ink-400 hover:text-ink-200"
+          }`}
+        >
+          {copied ? "✓ 已复制" : "复制全部"}
+        </button>
+      </div>
+      <textarea
+        readOnly
+        value={text}
+        className="w-full h-52 text-[11px] font-mono text-ink-400 bg-transparent resize-y outline-none leading-relaxed scrollbar-thin"
+      />
+      <p className="mt-2 text-[11px] text-ink-600 leading-relaxed">
+        将【系统提示词】贴入 AI 的&ldquo;系统提示&rdquo;栏，【用户输入】贴入对话框。
+        <br />
+        ChatGPT / Claude / Kimi 等均可使用。
+      </p>
+    </div>
   );
 }
 
@@ -160,6 +263,11 @@ function ErrorView({
           <span className="text-ink-300">GEMINI_API_KEY=your_key_here</span>
           <br />
           然后重启 <span className="text-amber">npm run dev</span>
+        </p>
+        <p className="mt-3 text-xs text-ink-500">
+          或点右上角
+          <span className="text-ink-300 font-mono"> 导出提示词 </span>
+          手动询问其他 AI。
         </p>
       </div>
     );

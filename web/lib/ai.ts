@@ -11,7 +11,7 @@ import type { IndicatorPoint, PricePoint, Signal } from "./types";
 // 2. 不给具体操作建议(那是 signals.ts 的规则引擎职责)
 // 3. 用词约束 + 长度约束,避免营销腔
 // ============================================================
-const SYSTEM_PROMPT = `你是 FundLens 内置的数据解说员。
+export const SYSTEM_PROMPT = `你是 FundLens 内置的数据解说员。
 
 【职责】
 将下面 INPUT 中提供的结构化技术指标数字,翻译为 100-200 字的自然语言判断。

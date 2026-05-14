@@ -9,7 +9,7 @@ export async function GET(
 ) {
   try {
     const range = req.nextUrl.searchParams.get("range") || "1y";
-    const prices = getPrices(params.code, range);
+    const prices = await getPrices(params.code, range);
     return NextResponse.json({ code: params.code, range, prices });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";

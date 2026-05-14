@@ -9,19 +9,20 @@ import type { Signal } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default function HomePage() {
-  const funds = listFunds();
+export default async function HomePage() {
+  const funds = await listFunds();
 
-  // 给每只基金计算信号(SSR)
-  const enriched = funds.map((fund) => {
-    const latest = getLatestIndicator(fund.code);
-    const close = getLatestClose(fund.code);
-    let signal: Signal | null = null;
-    if (latest && close !== null) {
-      signal = generateSignal(latest, close);
-    }
-    return { fund, latest, close, signal };
-  });
+  const enriched = await Promise.all(
+    funds.map(async (fund) => {
+      const latest = await getLatestIndicator(fund.code);
+      const close = await getLatestClose(fund.code);
+      let signal: Signal | null = null;
+      if (latest && close !== null) {
+        signal = generateSignal(latest, close);
+      }
+      return { fund, latest, close, signal };
+    }),
+  );
 
   return (
     <main className="mx-auto max-w-6xl px-5 md:px-8 py-10 md:py-16">

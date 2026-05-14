@@ -17,7 +17,6 @@ import {
 import { generateSignal } from "@/lib/signals";
 
 export const dynamic = "force-dynamic";
-// AI 调用可能 5-15 秒,稍微给点超时余地
 export const maxDuration = 30;
 
 export async function GET(
@@ -26,10 +25,12 @@ export async function GET(
 ) {
   const { code } = params;
 
-  // 1. 拼上下文
-  const fund = getFund(code);
-  const latest = getLatestIndicator(code);
-  const close = getLatestClose(code);
+  const [fund, latest, close] = await Promise.all([
+    getFund(code),
+    getLatestIndicator(code),
+    getLatestClose(code),
+  ]);
+
   if (!fund || !latest || close === null) {
     return NextResponse.json(
       { error: "no data for this fund" },
@@ -37,14 +38,13 @@ export async function GET(
     );
   }
 
-  const prices30d = getPrices(code, "1m");
+  const prices30d = await getPrices(code, "1m");
   const signal = generateSignal(latest, close);
   const ctx = buildContext(code, fund.name, latest, close, prices30d, signal);
   const hash = contextHash(ctx);
   const model = getModelName();
 
-  // 2. 缓存优先
-  const cached = getCached(code, hash, model);
+  const cached = await getCached(code, hash, model);
   if (cached) {
     return NextResponse.json({
       code,
@@ -56,11 +56,10 @@ export async function GET(
     });
   }
 
-  // 3. 调 Gemini
   try {
     const prompt = buildUserPrompt(ctx);
     const analysis = await callGemini(prompt);
-    saveCache(code, hash, model, JSON.stringify(ctx), analysis);
+    await saveCache(code, hash, model, JSON.stringify(ctx), analysis);
     return NextResponse.json({
       code,
       analysis,
@@ -71,7 +70,6 @@ export async function GET(
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "AI service unavailable";
-    // 503 — 服务暂不可用。前端会优雅展示。
     return NextResponse.json({ error: msg }, { status: 503 });
   }
 }

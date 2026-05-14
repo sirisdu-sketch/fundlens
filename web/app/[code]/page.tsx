@@ -23,21 +23,20 @@ interface PageProps {
   searchParams: { range?: string };
 }
 
-export default function FundDetailPage({ params, searchParams }: PageProps) {
-  const fund = getFund(params.code);
+export default async function FundDetailPage({ params, searchParams }: PageProps) {
+  const fund = await getFund(params.code);
   if (!fund) notFound();
 
   const range = searchParams.range || "1y";
-  const prices = getPrices(params.code, range);
-  const indicators = getIndicators(params.code, range);
+  const [prices, indicators, latest, close, prices1y] = await Promise.all([
+    getPrices(params.code, range),
+    getIndicators(params.code, range),
+    getLatestIndicator(params.code),
+    getLatestClose(params.code),
+    getPrices(params.code, "1y"),
+  ]);
 
-  // Hero 卡用最新一行(不受 range 影响)
-  const latest = getLatestIndicator(params.code);
-  const close = getLatestClose(params.code);
   const signal = latest && close !== null ? generateSignal(latest, close) : null;
-
-  // 最大回撤按近 1 年算(独立于 range,因为它要稳定)
-  const prices1y = getPrices(params.code, "1y");
   const maxDD = computeMaxDrawdown(prices1y);
 
   return (
